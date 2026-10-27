@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<!--
+  Vehicle Lot Tracking Sheet
+  Version: v1.3
+  File: index-v1.3-20261026-2217-01.html
+  Build date: 2026-10-26 22:17 (America/New_York)
+  Changelog: v1.3 - Notes column left-justified (screen and print)
+             v1.2 - Print layout matches paper sheet: "NIS Report MM/DD/YY" title, landscape,
+                    all 15 columns, no browser header/footer/page numbers
+             v1.1 - Added Import CSV (accepts this app's CSV export format)
+             v1.0 - Initial release
+  Author: Thinkezly
+  Notes: Single-file, offline-capable app. Data is stored in the browser (localStorage).
+         Use Export JSON to back up / move data between computers.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vehicle Lot Tracker v1.3</title>
+<style>
+  /* Vehicle Lot Tracker v1.3 */
+  :root{
+    --bg:#f3f4f6; --panel:#ffffff; --ink:#111827; --muted:#6b7280; --line:#d1d5db;
+    --head:#111827; --headInk:#ffffff; --accent:#2563eb; --accentInk:#ffffff;
+    --danger:#dc2626; --ok:#16a34a; --stripe:#f9fafb; --edit:#fef9c3;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f172a; --panel:#1e293b; --ink:#e5e7eb; --muted:#94a3b8; --line:#334155;
+      --head:#020617; --headInk:#e5e7eb; --stripe:#172033; --edit:#3f3a12;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  header{background:var(--head);color:var(--headInk);padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+  header h1{margin:0;font-size:18px}
+  .ver{font-size:12px;opacity:.75;margin-left:8px}
+  main{max-width:1400px;margin:0 auto;padding:16px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px}
+  .panel h2{margin:0 0 10px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:4px}
+  input[type=text],input[type=number],textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 8px}
+  textarea{resize:vertical;min-height:38px}
+  .notes{grid-column:1/-1}
+  .days{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .day{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--ink);font-size:13px;flex-direction:row}
+  .day input{width:16px;height:16px}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:7px 12px;cursor:pointer}
+  button:hover{filter:brightness(.95)}
+  .primary{background:var(--accent);border-color:var(--accent);color:var(--accentInk)}
+  .danger{color:var(--danger);border-color:var(--danger)}
+  .small{padding:4px 8px;font-size:12px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .toolbar .spacer{flex:1}
+  .search{min-width:200px}
+  .tablewrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:1100px}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:center;vertical-align:middle}
+  th{background:var(--head);color:var(--headInk);font-size:12px;text-transform:uppercase;position:sticky;top:0}
+  tbody tr:nth-child(even){background:var(--stripe)}
+  tr.editing{background:var(--edit)!important}
+  td.notes-cell{text-align:left;min-width:180px}
+  td.x{font-weight:700;font-size:16px}
+  .count{color:var(--muted);font-size:12px}
+  .toast{position:fixed;bottom:16px;right:16px;background:var(--head);color:var(--headInk);padding:10px 14px;border-radius:6px;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
+  #printTitle{display:none}
+  /* ---------- Print layout v1.2: matches paper lot sheet ---------- */
+  @page{size:landscape;margin:0}           /* margin 0 removes browser header, footer and page numbers */
+  @media print{
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    html,body{background:#fff!important;color:#000!important}
+    body{padding:0.35in 0.4in;font-family:Calibri,"Segoe UI",Arial,sans-serif}
+    header, #formPanel, .toolbar, .actions-col, footer, .toast{display:none!important}
+    main{max-width:none;padding:0;margin:0}
+    .panel{border:none;padding:0;margin:0;background:#fff}
+    .tablewrap{overflow:visible}
+    #printTitle{display:block;font-size:20px;font-weight:700;margin:0 0 8px;color:#000}
+    table{min-width:0;width:100%;table-layout:fixed;font-size:11px;border:1.5px solid #000}
+    thead{display:table-header-group}
+    tr{page-break-inside:avoid}
+    th{position:static;background:#000!important;color:#fff!important;border:1px solid #555;
+       font-size:10.5px;font-weight:700;padding:5px 3px;text-transform:uppercase}
+    th:first-child{color:#000!important}
+    td{border:1px solid #333;padding:0 4px;height:24px;color:#000;background:#fff;
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    tbody tr:nth-child(odd) td{background:#e6e6e6!important}
+    tbody tr:nth-child(even) td{background:#c8c8c8!important}
+    tr.editing td{background:inherit}
+    td:first-child{text-align:left;font-weight:600}
+    td.notes-cell{text-align:left;min-width:0}
+    td.x{font-size:13px}
+    col.c-n{width:3%} col.c-yr{width:5%} col.c-mk{width:9.5%} col.c-md{width:9.5%}
+    col.c-vin{width:9%} col.c-clr{width:7.5%} col.c-stk{width:10%} col.c-d{width:3.6%}
+    col.c-nt{width:21.3%} col.c-act{width:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Vehicle Lot Tracker <span class="ver">v1.3 · 2026-10-26</span></h1>
+  <div class="toolbar">
+    <button id="btnExportCsv">Export CSV</button>
+    <button id="btnExportJson">Export JSON</button>
+    <button id="btnImportJson">Import JSON</button>
+    <input type="file" id="fileJson" accept=".json,application/json" hidden>
+    <button id="btnImportCsv">Import CSV</button>
+    <input type="file" id="fileCsv" accept=".csv,text/csv" hidden>
+    <button id="btnPrint">Print</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel" id="formPanel">
+    <h2 id="formTitle">Add Vehicle</h2>
+    <form id="form" autocomplete="off">
+      <div class="grid">
+        <label>Year<input type="text" id="year" maxlength="4" inputmode="numeric" placeholder="e.g. 2021"></label>
+        <label>Make<input type="text" id="make" required></label>
+        <label>Model<input type="text" id="model" required></label>
+        <label>Last 6 of VIN<input type="text" id="vin6" maxlength="6" placeholder="6 chars" style="text-transform:uppercase"></label>
+        <label>Color<input type="text" id="color"></label>
+        <label>New Stock #<input type="text" id="stock"></label>
+        <label class="notes">Notes<textarea id="notes" rows="1"></textarea></label>
+      </div>
+      <div class="days" id="days"></div>
+      <div class="btns">
+        <button type="submit" class="primary" id="btnSave">Add Record</button>
+        <button type="button" id="btnCancel" hidden>Cancel Edit</button>
+        <button type="button" id="btnClearForm">Clear Form</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="toolbar" style="margin-bottom:10px">
+      <input type="text" id="search" class="search" placeholder="Search make, model, VIN, notes…">
+      <span class="count" id="count"></span>
+      <span class="spacer"></span>
+      <button class="small danger" id="btnClearAll">Delete All</button>
+    </div>
+    <div class="tablewrap">
+      <div id="printTitle">NIS Report</div>
+      <table>
+        <colgroup>
+          <col class="c-n"><col class="c-yr"><col class="c-mk"><col class="c-md"><col class="c-vin"><col class="c-clr"><col class="c-stk">
+          <col class="c-d"><col class="c-d"><col class="c-d"><col class="c-d"><col class="c-d"><col class="c-d"><col class="c-d">
+          <col class="c-nt"><col class="c-act actions-col">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th><th>Year</th><th>Make</th><th>Model</th><th>Last 6 of VIN</th><th>Color</th><th>New Stock #</th>
+            <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+            <th>Notes</th><th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<footer>Vehicle Lot Tracker v1.3 · Data is saved in this browser only — use Export JSON to back up or move it.</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+/* Vehicle Lot Tracker v1.3 — 2026-10-26 */
+(function(){
+  'use strict';
+  const APP_VERSION = '1.3';
+  const STORE_KEY = 'vehicleLotTracker.records';
+  const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+  const DAY_LABELS = {mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
+  const FIELDS = ['year','make','model','vin6','color','stock','notes'];
+
+  let records = [];
+  let editId = null;
+  let memoryOnly = false;
+
+  const $ = id => document.getElementById(id);
+
+  // ---------- storage ----------
+  function load(){
+    try{ const raw = localStorage.getItem(STORE_KEY); records = raw ? JSON.parse(raw) : []; }
+    catch(e){ records = []; memoryOnly = true; }
+    if(!Array.isArray(records)) records = [];
+  }
+  function save(){
+    if(memoryOnly) return;
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(records)); }
+    catch(e){ memoryOnly = true; toast('Browser storage unavailable — export JSON to keep your data'); }
+  }
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+  // ---------- form ----------
+  function buildDays(){
+    $('days').innerHTML = DAYS.map(d =>
+      `<label class="day"><input type="checkbox" id="day_${d}"> ${DAY_LABELS[d]}</label>`).join('');
+  }
+  function readForm(){
+    const r = {};
+    FIELDS.forEach(f => r[f] = $(f).value.trim());
+    r.vin6 = r.vin6.toUpperCase();
+    DAYS.forEach(d => r[d] = $('day_'+d).checked);
+    return r;
+  }
+  function fillForm(r){
+    FIELDS.forEach(f => $(f).value = r[f] || '');
+    DAYS.forEach(d => $('day_'+d).checked = !!r[d]);
+  }
+  function resetForm(){
+    $('form').reset();
+    editId = null;
+    $('formTitle').textContent = 'Add Vehicle';
+    $('btnSave').textContent = 'Add Record';
+    $('btnCancel').hidden = true;
+    render();
+  }
+
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const data = readForm();
+    if(!data.make && !data.model && !data.vin6){ toast('Enter at least Make, Model or VIN'); return; }
+    if(editId){
+      const i = records.findIndex(r => r.id === editId);
+      if(i > -1) records[i] = Object.assign({}, records[i], data, {updatedAt:new Date().toISOString()});
+      toast('Record updated');
+    }else{
+      records.push(Object.assign({id:uid(), createdAt:new Date().toISOString()}, data));
+      toast('Record added');
+    }
+    save(); resetForm(); $('make').focus();
+  });
+  $('btnCancel').onclick = resetForm;
+  $('btnClearForm').onclick = () => { if(editId) resetForm(); else $('form').reset(); };
+
+  // ---------- table ----------
+  function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function render(){
+    const q = $('search').value.trim().toLowerCase();
+    const rows = records.map((r,i)=>({r,n:i+1})).filter(({r}) =>
+      !q || FIELDS.some(f => String(r[f]||'').toLowerCase().includes(q)));
+    $('tbody').innerHTML = rows.length ? rows.map(({r,n}) => `
+      <tr class="${r.id===editId?'editing':''}">
+        <td>${n}</td><td>${esc(r.year)}</td><td>${esc(r.make)}</td><td>${esc(r.model)}</td>
+        <td>${esc(r.vin6)}</td><td>${esc(r.color)}</td><td>${esc(r.stock)}</td>
+        ${DAYS.map(d=>`<td class="x">${r[d]?'X':''}</td>`).join('')}
+        <td class="notes-cell">${esc(r.notes)}</td>
+        <td class="actions-col" style="white-space:nowrap">
+          <button class="small" data-act="edit" data-id="${r.id}">Edit</button>
+          <button class="small danger" data-act="del" data-id="${r.id}">Delete</button>
+        </td>
+      </tr>`).join('')
+      : `<tr><td colspan="16" style="padding:20px;color:var(--muted)">No records${q?' match your search':' yet — add one above or import CSV/JSON'}.</td></tr>`;
+    $('count').textContent = `${rows.length} of ${records.length} record${records.length===1?'':'s'}`;
+  }
+
+  $('tbody').addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b) return;
+    const r = records.find(x => x.id === b.dataset.id); if(!r) return;
+    if(b.dataset.act === 'edit'){
+      editId = r.id; fillForm(r);
+      $('formTitle').textContent = 'Edit Vehicle';
+      $('btnSave').textContent = 'Save Changes';
+      $('btnCancel').hidden = false;
+      render();
+      $('formPanel').scrollIntoView({behavior:'smooth'});
+    }else if(b.dataset.act === 'del'){
+      if(confirm(`Delete ${r.make} ${r.model} (${r.vin6||'no VIN'})?`)){
+        records = records.filter(x => x.id !== r.id);
+        if(editId === r.id) resetForm();
+        save(); render(); toast('Record deleted');
+      }
+    }
+  });
+  $('search').addEventListener('input', render);
+  $('btnClearAll').onclick = () => {
+    if(!records.length) return;
+    if(confirm('Delete ALL records? Export JSON first if you want a backup.')){
+      records = []; save(); resetForm(); toast('All records deleted');
+    }
+  };
+
+  // ---------- export / import ----------
+  function stamp(){
+    const d = new Date(), p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+  }
+  function download(name, content, type){
+    const blob = new Blob([content], {type});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function csvCell(v){ v = String(v ?? ''); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
+
+  $('btnExportCsv').onclick = () => {
+    if(!records.length){ toast('No records to export'); return; }
+    const head = ['#','Year','Make','Model','Last 6 of VIN','Color','New Stock #','Mon','Tue','Wed','Thu','Fri','Sat','Sun','Notes'];
+    const lines = [head.join(',')].concat(records.map((r,i) => [
+      i+1, r.year, r.make, r.model, r.vin6, r.color, r.stock,
+      ...DAYS.map(d => r[d] ? 'X' : ''), r.notes
+    ].map(csvCell).join(',')));
+    download(`vehicle-lot-tracker-v${APP_VERSION}-${stamp()}.csv`, '\uFEFF' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+    toast('CSV exported');
+  };
+
+  $('btnExportJson').onclick = () => {
+    const payload = {app:'Vehicle Lot Tracker', version:APP_VERSION, exportedAt:new Date().toISOString(), records};
+    download(`vehicle-lot-tracker-v${APP_VERSION}-${stamp()}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    toast('JSON exported');
+  };
+
+  function normalize(r){
+    const o = {id: r.id || uid(), createdAt: r.createdAt || new Date().toISOString()};
+    FIELDS.forEach(f => o[f] = String(r[f] ?? '').trim());
+    o.vin6 = o.vin6.toUpperCase();
+    DAYS.forEach(d => o[d] = r[d] === true || String(r[d] ?? '').trim().toUpperCase() === 'X');
+    return o;
+  }
+  function applyImport(list){
+    const clean = list.map(normalize);
+    if(!clean.length){ toast('No records found in file'); return; }
+    const replace = records.length
+      ? confirm(`Import ${clean.length} record(s).\n\nOK = REPLACE current data\nCancel = MERGE (add to current data)`)
+      : true;
+    if(replace) records = clean;
+    else {
+      const ids = new Set(records.map(r => r.id));
+      clean.forEach(r => { if(ids.has(r.id)) r.id = uid(); records.push(r); });
+    }
+    save(); resetForm(); toast(`Imported ${clean.length} record(s)`);
+  }
+
+  // CSV parser (handles quotes, escaped quotes, commas/newlines in fields, BOM)
+  function parseCsv(text){
+    text = text.replace(/^\uFEFF/, '');
+    const rows = []; let row = [], cell = '', q = false;
+    for(let i = 0; i < text.length; i++){
+      const c = text[i];
+      if(q){
+        if(c === '"'){ if(text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+        else cell += c;
+      }else if(c === '"') q = true;
+      else if(c === ','){ row.push(cell); cell = ''; }
+      else if(c === '\n' || c === '\r'){
+        if(c === '\r' && text[i+1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = '';
+      }else cell += c;
+    }
+    if(cell !== '' || row.length){ row.push(cell); rows.push(row); }
+    return rows.filter(r => r.some(v => v.trim() !== ''));
+  }
+  const CSV_MAP = {'year':'year','make':'make','model':'model','last 6 of vin':'vin6','vin':'vin6','vin6':'vin6',
+    'color':'color','new stock #':'stock','stock':'stock','stock #':'stock','notes':'notes',
+    'mon':'mon','tue':'tue','wed':'wed','thu':'thu','fri':'fri','sat':'sat','sun':'sun'};
+  function csvToRecords(text){
+    const rows = parseCsv(text);
+    if(rows.length < 2) throw new Error('CSV has no data rows');
+    const keys = rows[0].map(h => CSV_MAP[h.trim().toLowerCase()] || null);
+    if(!keys.some(k => k === 'make' || k === 'model' || k === 'vin6')) throw new Error('Header row not recognized');
+    return rows.slice(1).map(cols => {
+      const r = {}; keys.forEach((k,i) => { if(k) r[k] = cols[i] ?? ''; }); return r;
+    });
+  }
+
+  $('btnImportCsv').onclick = () => $('fileCsv').click();
+  $('fileCsv').addEventListener('change', e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{ applyImport(csvToRecords(reader.result)); }
+      catch(err){ alert('CSV import failed: ' + err.message); }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  $('btnImportJson').onclick = () => $('fileJson').click();
+  $('fileJson').addEventListener('change', e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const data = JSON.parse(reader.result);
+        const list = Array.isArray(data) ? data : data.records;
+        if(!Array.isArray(list)) throw new Error('No records array found');
+        applyImport(list);
+      }catch(err){ alert('Import failed: ' + err.message); }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  // Print title: "NIS Report MM/DD/YY" (today's date at print time)
+  function setPrintTitle(){
+    const d = new Date(), p = n => String(n).padStart(2,'0');
+    $('printTitle').textContent = `NIS Report ${p(d.getMonth()+1)}/${p(d.getDate())}/${String(d.getFullYear()).slice(-2)}`;
+  }
+  window.addEventListener('beforeprint', () => {   // also covers Ctrl+P
+    setPrintTitle();
+    if($('search').value){ $('search').value = ''; render(); }   // always print every record
+  });
+  $('btnPrint').onclick = () => { setPrintTitle(); window.print(); };
+  setPrintTitle();
+
+  // ---------- toast ----------
+  let tTimer;
+  function toast(msg){
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(tTimer); tTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ---------- init ----------
+  buildDays(); load(); render();
+  if(memoryOnly) toast('Browser storage blocked — data will not persist; use Export JSON');
+})();
+</script>
+</body>
+</html>
