@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <!--
   Vehicle Lot Tracking Sheet
-  Version: v1.3
-  File: index-v1.3-20261026-2217-01.html
-  Build date: 2026-10-26 22:17 (America/New_York)
-  Changelog: v1.3 - Notes column left-justified (screen and print)
+  Version: v1.4
+  File: index-v1.4-20261026-2227-01.html
+  Build date: 2026-10-26 22:27 (America/New_York)
+  Changelog: v1.4 - Multi-select: row checkboxes, Select All, Delete Selected (screen only, not printed)
+             v1.3 - Notes column left-justified (screen and print)
              v1.2 - Print layout matches paper sheet: "NIS Report MM/DD/YY" title, landscape,
                     all 15 columns, no browser header/footer/page numbers
              v1.1 - Added Import CSV (accepts this app's CSV export format)
@@ -17,9 +18,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vehicle Lot Tracker v1.3</title>
+<title>Vehicle Lot Tracker v1.4</title>
 <style>
-  /* Vehicle Lot Tracker v1.3 */
+  /* Vehicle Lot Tracker v1.4 */
   :root{
     --bg:#f3f4f6; --panel:#ffffff; --ink:#111827; --muted:#6b7280; --line:#d1d5db;
     --head:#111827; --headInk:#ffffff; --accent:#2563eb; --accentInk:#ffffff;
@@ -64,6 +65,9 @@
   tr.editing{background:var(--edit)!important}
   td.notes-cell{text-align:left;min-width:180px}
   td.x{font-weight:700;font-size:16px}
+  .sel-col{width:34px} .sel-col input{width:16px;height:16px;cursor:pointer}
+  tr.selected{background:var(--edit)!important}
+  button:disabled{opacity:.45;cursor:default}
   .count{color:var(--muted);font-size:12px}
   .toast{position:fixed;bottom:16px;right:16px;background:var(--head);color:var(--headInk);padding:10px 14px;border-radius:6px;opacity:0;transition:opacity .25s;pointer-events:none}
   .toast.show{opacity:1}
@@ -75,7 +79,8 @@
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     html,body{background:#fff!important;color:#000!important}
     body{padding:0.35in 0.4in;font-family:Calibri,"Segoe UI",Arial,sans-serif}
-    header, #formPanel, .toolbar, .actions-col, footer, .toast{display:none!important}
+    header, #formPanel, .toolbar, .actions-col, .sel-col, footer, .toast{display:none!important}
+    tbody tr.selected td{background:inherit}
     main{max-width:none;padding:0;margin:0}
     .panel{border:none;padding:0;margin:0;background:#fff}
     .tablewrap{overflow:visible}
@@ -85,13 +90,13 @@
     tr{page-break-inside:avoid}
     th{position:static;background:#000!important;color:#fff!important;border:1px solid #555;
        font-size:10.5px;font-weight:700;padding:5px 3px;text-transform:uppercase}
-    th:first-child{color:#000!important}
+    th.num-col{color:#000!important}
     td{border:1px solid #333;padding:0 4px;height:24px;color:#000;background:#fff;
        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    tbody tr:nth-child(odd) td{background:#e6e6e6!important}
-    tbody tr:nth-child(even) td{background:#c8c8c8!important}
+    tbody tr:nth-child(odd) td, tbody tr.selected:nth-child(odd) td{background:#e6e6e6!important}
+    tbody tr:nth-child(even) td, tbody tr.selected:nth-child(even) td{background:#c8c8c8!important}
     tr.editing td{background:inherit}
-    td:first-child{text-align:left;font-weight:600}
+    td.num-col{text-align:left;font-weight:600}
     td.notes-cell{text-align:left;min-width:0}
     td.x{font-size:13px}
     col.c-n{width:3%} col.c-yr{width:5%} col.c-mk{width:9.5%} col.c-md{width:9.5%}
@@ -102,7 +107,7 @@
 </head>
 <body>
 <header>
-  <h1>Vehicle Lot Tracker <span class="ver">v1.3 · 2026-10-26</span></h1>
+  <h1>Vehicle Lot Tracker <span class="ver">v1.4 · 2026-10-26</span></h1>
   <div class="toolbar">
     <button id="btnExportCsv">Export CSV</button>
     <button id="btnExportJson">Export JSON</button>
@@ -141,19 +146,20 @@
       <input type="text" id="search" class="search" placeholder="Search make, model, VIN, notes…">
       <span class="count" id="count"></span>
       <span class="spacer"></span>
+      <button class="small danger" id="btnDelSelected" disabled>Delete Selected</button>
       <button class="small danger" id="btnClearAll">Delete All</button>
     </div>
     <div class="tablewrap">
       <div id="printTitle">NIS Report</div>
       <table>
         <colgroup>
-          <col class="c-n"><col class="c-yr"><col class="c-mk"><col class="c-md"><col class="c-vin"><col class="c-clr"><col class="c-stk">
+          <col class="sel-col"><col class="c-n"><col class="c-yr"><col class="c-mk"><col class="c-md"><col class="c-vin"><col class="c-clr"><col class="c-stk">
           <col class="c-d"><col class="c-d"><col class="c-d"><col class="c-d"><col class="c-d"><col class="c-d"><col class="c-d">
           <col class="c-nt"><col class="c-act actions-col">
         </colgroup>
         <thead>
           <tr>
-            <th>#</th><th>Year</th><th>Make</th><th>Model</th><th>Last 6 of VIN</th><th>Color</th><th>New Stock #</th>
+            <th class="sel-col"><input type="checkbox" id="selAll" title="Select all shown"></th><th class="num-col">#</th><th>Year</th><th>Make</th><th>Model</th><th>Last 6 of VIN</th><th>Color</th><th>New Stock #</th>
             <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
             <th>Notes</th><th class="actions-col">Actions</th>
           </tr>
@@ -163,14 +169,14 @@
     </div>
   </section>
 </main>
-<footer>Vehicle Lot Tracker v1.3 · Data is saved in this browser only — use Export JSON to back up or move it.</footer>
+<footer>Vehicle Lot Tracker v1.4 · Data is saved in this browser only — use Export JSON to back up or move it.</footer>
 <div class="toast" id="toast"></div>
 
 <script>
-/* Vehicle Lot Tracker v1.3 — 2026-10-26 */
+/* Vehicle Lot Tracker v1.4 — 2026-10-26 */
 (function(){
   'use strict';
-  const APP_VERSION = '1.3';
+  const APP_VERSION = '1.4';
   const STORE_KEY = 'vehicleLotTracker.records';
   const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
   const DAY_LABELS = {mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
@@ -179,6 +185,8 @@
   let records = [];
   let editId = null;
   let memoryOnly = false;
+  const selected = new Set();
+  let lastShown = [];
 
   const $ = id => document.getElementById(id);
 
@@ -245,8 +253,9 @@
     const rows = records.map((r,i)=>({r,n:i+1})).filter(({r}) =>
       !q || FIELDS.some(f => String(r[f]||'').toLowerCase().includes(q)));
     $('tbody').innerHTML = rows.length ? rows.map(({r,n}) => `
-      <tr class="${r.id===editId?'editing':''}">
-        <td>${n}</td><td>${esc(r.year)}</td><td>${esc(r.make)}</td><td>${esc(r.model)}</td>
+      <tr class="${r.id===editId?'editing':''}${selected.has(r.id)?' selected':''}">
+        <td class="sel-col"><input type="checkbox" class="rowSel" data-id="${r.id}" ${selected.has(r.id)?'checked':''}></td>
+        <td class="num-col">${n}</td><td>${esc(r.year)}</td><td>${esc(r.make)}</td><td>${esc(r.model)}</td>
         <td>${esc(r.vin6)}</td><td>${esc(r.color)}</td><td>${esc(r.stock)}</td>
         ${DAYS.map(d=>`<td class="x">${r[d]?'X':''}</td>`).join('')}
         <td class="notes-cell">${esc(r.notes)}</td>
@@ -255,8 +264,20 @@
           <button class="small danger" data-act="del" data-id="${r.id}">Delete</button>
         </td>
       </tr>`).join('')
-      : `<tr><td colspan="16" style="padding:20px;color:var(--muted)">No records${q?' match your search':' yet — add one above or import CSV/JSON'}.</td></tr>`;
+      : `<tr><td colspan="17" style="padding:20px;color:var(--muted)">No records${q?' match your search':' yet — add one above or import CSV/JSON'}.</td></tr>`;
     $('count').textContent = `${rows.length} of ${records.length} record${records.length===1?'':'s'}`;
+    lastShown = rows.map(x => x.r.id);
+    updateSelUI();
+  }
+  function updateSelUI(){
+    // drop selections for records that no longer exist
+    for(const id of [...selected]) if(!records.some(r => r.id === id)) selected.delete(id);
+    const n = selected.size;
+    $('btnDelSelected').disabled = !n;
+    $('btnDelSelected').textContent = n ? `Delete Selected (${n})` : 'Delete Selected';
+    const shownSel = lastShown.filter(id => selected.has(id)).length;
+    $('selAll').checked = lastShown.length > 0 && shownSel === lastShown.length;
+    $('selAll').indeterminate = shownSel > 0 && shownSel < lastShown.length;
   }
 
   $('tbody').addEventListener('click', e => {
@@ -277,6 +298,26 @@
       }
     }
   });
+  $('tbody').addEventListener('change', e => {
+    if(!e.target.classList.contains('rowSel')) return;
+    const id = e.target.dataset.id;
+    e.target.checked ? selected.add(id) : selected.delete(id);
+    e.target.closest('tr').classList.toggle('selected', e.target.checked);
+    updateSelUI();
+  });
+  $('selAll').addEventListener('change', e => {
+    lastShown.forEach(id => e.target.checked ? selected.add(id) : selected.delete(id));
+    render();
+  });
+  $('btnDelSelected').onclick = () => {
+    const n = selected.size; if(!n) return;
+    if(confirm(`Delete ${n} selected record${n===1?'':'s'}?`)){
+      if(selected.has(editId)) editId = null;
+      records = records.filter(r => !selected.has(r.id));
+      selected.clear();
+      save(); resetForm(); toast(`${n} record${n===1?'':'s'} deleted`);
+    }
+  };
   $('search').addEventListener('input', render);
   $('btnClearAll').onclick = () => {
     if(!records.length) return;
